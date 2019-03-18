@@ -19,3 +19,24 @@ cruiseWhenNotImpeded := alw_[0,T] (comfortableGap => (comfortableGap until_[0, r
 # it's not the case that host car just arbitrarily stops without the lead car having stopped first
 param reallySmallSpeed = 0.1
 dontStopUnlessLeadStops := not((LeadVelocity[t] > reallySmallSpeed) until_[0,T] (HostVelocity[t] < reallySmallSpeed))
+
+# MY CUSTOM REQUIREMENTS WITH SOME NOTES
+# When lead car velocity is less than reference velocity and the distance is near dSafe, host car matches lead car's velocity
+# Why is this a good requirement to have?
+# Having only check for distance being at least dSafe does not ensure that host car maintains a good velocity to move
+# forward, for example, host car might be going far slower compared to lead car to meet the gap requirement but that maynot
+# be the desired behavior. This requirement complements the gap requirement such that host car should maintain 'reasonable' speed 
+# while ensuring safety.
+leadCarSlowerThanReference := LeadVelocity[t] < cruiseSpeed
+closeToLead := (LeadPosition[t] - HostPosition[t] < 3*dSafe)
+followsLead := (abs(HostVelocity[t] - LeadVelocity[t]) < reallySmallSpeed)
+hostFollowsLeadVelocity := alw_[0,T] ((leadCarSlowerThanReference and closeToLead) => (ev_[0, responseTime] followsLead)) 
+
+# Host car should not go past cruiseSpeed (with certain tolerance and within certain time to brint it back)
+# I don't know if there is a methodical way to come up with the parameters like upper bound factor 1.1 and 
+# time to reduce to velocity i.e., 6 seconds. For now, I just chose random numbers and adjusted so that
+# my implementation meets the requirements but I realize that's not the correct way. I am assuming that these
+# come from real world requirements.
+hostVelocityBounded := alw_[0, T] (HostVelocity[t] < (cruiseSpeed * 1.1))
+hostVelocityLessThanReference := HostVelocity[t] <= cruiseSpeed
+hostVelocityComesBackToReference := alw_[0, T] ((not hostVelocityLessThanReference) => (ev_[0, 6] hostVelocityLessThanReference))
