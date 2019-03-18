@@ -1,4 +1,4 @@
-param dSafe = 5
+param dSafe = 2
 param T = 50
 
 # cars follow at safe distance
