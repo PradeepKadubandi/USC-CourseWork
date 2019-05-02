@@ -43,7 +43,7 @@
 % variables. If done once, this block could be skipped or commented out.
 % rootDataPath = 'D:\Grad-School\Assignments\599-CPS\HW3\HW3_Resources\KITTI_MOD_fixed\';
 rootDataPath = 'KITTI_MOD_fixed';
-trainingData = parseVehicleData(fullfile(rootDataPath, 'training'), '2011_09_26_drive_0059_*');
+trainingData = parseVehicleData(fullfile(rootDataPath, 'training'), '2011_09_26_drive_0057_*');
 testData = parseVehicleData(fullfile(rootDataPath, 'testing'), '2011_09_26_drive_*');
 
 %% Scale the data to 240 x 240 size for resnet
@@ -199,33 +199,36 @@ layers = [
 % independent training options for each step. To specify the network
 % training options use |trainingOptions| from Deep Learning Toolbox(TM).
 
-checkpointpath = 'D:\Grad-School\Assignments\599-CPS\HW3\HW3_Resources\checkpoints\resnet50\drive_0059';
+checkpointpath = '/home/pkadubandi/GH/PradeepKadubandi/USC-CourseWork/599-CPS/HW3/checkpoints/resnet50/drive_0057/05-02-07-options-5-epoch';
+
+epochs = 5;
+mini_batch = 1;
 
 % Options for step 1.
 optionsStage1 = trainingOptions('sgdm', ...
-    'MaxEpochs', 1, ...
-    'MiniBatchSize', 1, ...
+    'MaxEpochs', epochs, ...
+    'MiniBatchSize', mini_batch, ...
     'InitialLearnRate', 1e-3, ...
     'CheckpointPath', checkpointpath);
 
 % Options for step 2.
 optionsStage2 = trainingOptions('sgdm', ...
-    'MaxEpochs', 1, ...
-    'MiniBatchSize', 1, ...
+    'MaxEpochs', epochs, ...
+    'MiniBatchSize', mini_batch, ...
     'InitialLearnRate', 1e-3, ...
     'CheckpointPath', checkpointpath);
 
 % Options for step 3.
 optionsStage3 = trainingOptions('sgdm', ...
-    'MaxEpochs', 1, ...
-    'MiniBatchSize', 1, ...
+    'MaxEpochs', epochs, ...
+    'MiniBatchSize', mini_batch, ...
     'InitialLearnRate', 1e-3, ...
     'CheckpointPath', checkpointpath);
 
 % Options for step 4.
 optionsStage4 = trainingOptions('sgdm', ...
-    'MaxEpochs', 1, ...
-    'MiniBatchSize', 1, ...
+    'MaxEpochs', epochs, ...
+    'MiniBatchSize', mini_batch, ...
     'InitialLearnRate', 1e-3, ...
     'CheckpointPath', checkpointpath);
 
@@ -298,6 +301,8 @@ if doTrainingAndEval
         'PositiveOverlapRange', [0.6 1], ...
         'NumRegionsToSample', [256 128 256 128], ...
         'BoxPyramidScale', 1.2);
+    
+    save(fullfile(checkpointpath, 'detector.mat'), 'detector');
 else
     % Load pretrained detector for the example.
     detector = data.detector;
@@ -316,6 +321,12 @@ I = imread(testData.imageFilename{1});
 I = insertObjectAnnotation(I, 'rectangle', bboxes, scores);
 figure
 imshow(I)
+
+%% Insepct data
+disp('inspecting training data');
+inspect_data(trainingData);
+disp('inspecting test data');
+inspect_data(testData);
 
 %% Evaluate Detector Using Test Set
 % Testing a single image showed promising results. To fully evaluate the
@@ -403,8 +414,14 @@ function vehicleData = parseVehicleData(rootFolder, filePattern)
                 if ~ischar(line); break; end
 
                 C = strsplit(line, ' ');
-                box = [str2num(C{4}), str2num(C{3}), str2num(C{6}) - str2num(C{4}), str2num(C{5}) - str2num(C{3})];
-                boxes = [boxes; box];
+                width = str2num(C{6}) - str2num(C{4});
+                height = str2num(C{5}) - str2num(C{3});
+                if (width > 0.0 && height > 0.0)
+                    box = [str2num(C{4}), str2num(C{3}), width, height];
+                    boxes = [boxes; box];
+                else
+                    fprintf('skipping row %f , box %f because of bad data \n', i, length(boxes));
+                end
             end
             table{i,2} = {boxes};
             fclose(f);
@@ -477,6 +494,24 @@ function expandedVehicleData = unrollBoundingBoxes(unexpandedVehicleData)
     expandedVehicleData = table;    
 end
 
+function inspect_data(data)
+    root = '/home/pkadubandi/GH/PradeepKadubandi/USC-CourseWork/599-CPS/HW3';
+    for i = 1:height(data)
+        I = imread(fullfile(root, data.imageFilename{i}));
+        [h, w, ~] = size(I);
+        v_dims = size(data.vehicle{i});
+        for j = 1:v_dims(1)
+            bbox = data.vehicle{i}(j, :);
+            if (bbox(3) <= 0 || bbox(4) <= 0)
+                fprintf('Row %f: Box %f contains non positive width = %f or height = %f \n', i, j, bbox(3), bbox(4));
+            end
+            if (bbox(1) < 0 || bbox(2) < 0 || bbox(1) > w || bbox(2) > h)
+                fprintf('Row %f: Box %f contains a pixel (%f, %f) out of bounds \n', i, j, bbox(1), bbox(2));
+            end
+        end
+    end
+end
+
 %% Summary
 % This example showed how to train a vehicle detector using deep learning.
 % You can follow similar steps to train detectors for traffic signs,
@@ -489,4 +524,3 @@ end
 % [1] Ren, Shaoqing, et al. "Faster R-CNN: Towards Real-Time Object
 % detection with Region Proposal Networks." _Advances in Neural Information
 % Processing Systems._ 2015.
-
