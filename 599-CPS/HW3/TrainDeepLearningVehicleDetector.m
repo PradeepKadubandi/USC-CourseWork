@@ -1,49 +1,9 @@
-%% Train a Deep Learning Vehicle Detector
-% This example shows how to train a vision-based vehicle detector using
-% deep learning. 
-%
-% Copyright 2016 The MathWorks, Inc.
-
-%% Overview
-% Vehicle detection using computer vision is an important component for
-% tracking vehicles around the ego vehicle. The ability to detect and track
-% vehicles is required for many autonomous driving applications, such as
-% for forward collision warning, adaptive cruise control, and automated
-% lane keeping. Automated Driving System Toolbox(TM) provides pretrained
-% vehicle detectors (|<docid:driving_ref#bvkk0xo-1
-% vehicleDetectorFasterRCNN>| and |<docid:driving_ref#bvinrr6-1
-% vehicleDetectorACF>|) to enable quick prototyping. However, the pretrained
-% models might not suit every application, requiring you to train from
-% scratch. This example shows how to train a vehicle detector from scratch
-% using deep learning.
-%
-% Deep learning is a powerful machine learning technique that automatically
-% learns image features required for detection tasks. There are several
-% techniques for object detection using deep learning. This example uses
-% the Faster R-CNN [1] technique, which is implemented in the
-% |<docid:vision_ref#bvkk009-1 trainFasterRCNNObjectDetector>| function.
-%
-% The example has the following sections:
-%
-% * Load a vehicle data set.
-% * Design the convolutional neural network (CNN).
-% * Configure training options.
-% * Train a Faster R-CNN object detector.
-% * Evaluate the trained detector.
-%
-% Note: This example requires Computer Vision System Toolbox(TM), Image
-% Processing Toolbox(TM), and Deep Learning Toolbox(TM).
-%
-% Using a CUDA-capable NVIDIA(TM) GPU with compute capability 3.0 or higher
-% is highly recommended for running this example. Use of a GPU requires
-% Parallel Computing Toolbox(TM).
-
 %% Prepare Data Set
 % Use this block to parse KITTI dataset and store in matlab workspace
 % variables. If done once, this block could be skipped or commented out.
 % rootDataPath = 'D:\Grad-School\Assignments\599-CPS\HW3\HW3_Resources\KITTI_MOD_fixed\';
 rootDataPath = 'KITTI_MOD_fixed';
-trainingData = parseVehicleData(fullfile(rootDataPath, 'training'), '2011_09_26_drive_0057_*');
+trainingData = parseVehicleData(fullfile(rootDataPath, 'training'), '2011_09_26_drive_0059*');
 testData = parseVehicleData(fullfile(rootDataPath, 'testing'), '2011_09_26_drive_*');
 
 %% Scale the data to 240 x 240 size for resnet
@@ -56,25 +16,6 @@ testData = parseVehicleData(fullfile(rootDataPath, 'testing'), '2011_09_26_drive
 % d = load('D:\Grad-School\Assignments\599-CPS\HW3\HW3_Resources\KITTI_MOD_fixed\training_scaled\unrolled_scaled_vehicleData_2011_09_26_drive_0057.mat');
 % unrolled_trainingData = d.table;
 
-%% Save the prepared data into matlab files
-% save('KITTI_Train_Data.mat', 'trainingData');
-% save('KITTI_Test_Data.mat', 'testData');
-
-%% Load Data Set
-% This example uses a small vehicle data set that contains 295 images. Each
-% image contains 1 to 2 labeled instances of a vehicle. A small data set is
-% useful for exploring the Faster R-CNN training procedure, but in
-% practice, more labeled images are needed to train a robust detector. To
-% label additional videos or images for training, you can use the
-% |groundTruthLabeler| app.
-
-% Load vehicle data set
-% d = load('KITTI_Train_Data.mat');
-% trainingData = d.trainingData;
-% 
-% d = load('KITTI_Test_Data.mat');
-% testData = d.testData;
-
 %%
 % The training data is stored in a table. The first column contains the
 % path to the image files. The remaining columns contain the ROI labels for
@@ -83,37 +24,6 @@ testData = parseVehicleData(fullfile(rootDataPath, 'testing'), '2011_09_26_drive
 % Display first few rows of the data set.
 trainingData(1:4,:)
 testData(1:4, :)
-
-%%
-% Display one of the images from the data set to understand the type of
-% images it contains.
-disp(trainingData.vehicle{10})
-disp(length(trainingData.vehicle{10}))
-I = imread(trainingData.imageFilename{10});
-[h_o, w_o, ~] = size(I);
-h_s = 240;
-w_s = 240;
-J = imresize(I, [h_s, w_s]);
-for i = 1:length(trainingData.vehicle{10})
-    original_bbox = trainingData.vehicle{10}(i, :);
-    scaled_bbox = [original_bbox(1)*w_s/w_o, original_bbox(2)*h_s/h_o, original_bbox(3)*w_s/w_o, original_bbox(4)*h_s/h_o];
-    I = insertShape(I, 'Rectangle', original_bbox);
-    J = insertShape(J, 'Rectangle', scaled_bbox);
-end
-figure
-imshow(I)
-figure
-imshow(J)
-
-%% Use already scaled training data
-index = 336;
-I = imread(trainingData.imageFilename{index});
-for i = 1:length(trainingData.vehicle{index})
-    original_bbox = trainingData.vehicle{index}(i, :);
-    I = insertShape(I, 'Rectangle', original_bbox);
-end
-figure
-imshow(I)
 
 %% Create a Convolutional Neural Network (CNN)
 % A CNN is the basis of the Faster R-CNN object detector. Create the CNN
@@ -199,9 +109,9 @@ layers = [
 % independent training options for each step. To specify the network
 % training options use |trainingOptions| from Deep Learning Toolbox(TM).
 
-checkpointpath = '/home/pkadubandi/GH/PradeepKadubandi/USC-CourseWork/599-CPS/HW3/checkpoints/resnet50/drive_0057/05-02-07-options-5-epoch';
+checkpointpath = '/home/pkadubandi/GH/PradeepKadubandi/USC-CourseWork/599-CPS/HW3/checkpoints/resnet50/drive_0059/05-02-22-options-1-epoch-1024-region-proposals';
 
-epochs = 5;
+epochs = 1;
 mini_batch = 1;
 
 % Options for step 1.
@@ -256,6 +166,10 @@ options = [
 latestCheckPointFile = fullfile(checkpointpath, 'faster_rcnn_stage_1_checkpoint__360__2019_05_01__14_12_42.mat');
 latestCheckPoint = load(latestCheckPointFile);
 
+%% Load saved detector
+d = load(fullfile(checkpointpath, 'detector.mat'), 'detector');
+detector = d.detector;
+
 %% Train Faster R-CNN
 % Now that the CNN and training options are defined, you can train the
 % detector using |trainFasterRCNNObjectDetector|.
@@ -296,13 +210,14 @@ if doTrainingAndEval
     
     % Train Faster R-CNN detector. Select a BoxPyramidScale of 1.2 to allow
     % for finer resolution for multiscale object detection.
-    detector = trainFasterRCNNObjectDetector(trainingData, 'resnet50', options, ...
+    [detector, train_info] = trainFasterRCNNObjectDetector(trainingData, 'resnet50', options, ...
         'NegativeOverlapRange', [0 0.3], ...
         'PositiveOverlapRange', [0.6 1], ...
-        'NumRegionsToSample', [256 128 256 128], ...
+        'NumRegionsToSample', [1024 512 1024 512], ...
         'BoxPyramidScale', 1.2);
     
     save(fullfile(checkpointpath, 'detector.mat'), 'detector');
+    save(fullfile(checkpointpath, 'train_info.mat'), 'train_info');
 else
     % Load pretrained detector for the example.
     detector = data.detector;
@@ -343,6 +258,7 @@ inspect_data(testData);
 % results by running the detector on the test set. To avoid long evaluation
 % time, the results are loaded from disk. Set the |doTrainingAndEval| flag
 % from the previous section to true to execute the evaluation locally.
+doTrainingAndEval = true;
 
 if doTrainingAndEval
     % Run detector on each image in the test set and collect results.
@@ -387,6 +303,49 @@ xlabel('Recall')
 ylabel('Precision')
 grid on
 title(sprintf('Average Precision = %.2f', ap))
+
+%% Plot training loss
+figure
+hold on
+plot(train_info(1).TrainingLoss, 'b-')
+plot(train_info(2).TrainingLoss, 'r-')
+plot(train_info(3).TrainingLoss, 'g-')
+plot(train_info(4).TrainingLoss, 'm-')
+xlabel('Iteration')
+ylabel('Training Loss')
+legend('Stage 1', 'Stage 2', 'Stage 3', 'Stage 4')
+title('Training Loss With Iterations')
+hold off
+%%
+% Display one of the images from the data set to understand the type of
+% images it contains.
+disp(trainingData.vehicle{10})
+disp(length(trainingData.vehicle{10}))
+I = imread(trainingData.imageFilename{10});
+[h_o, w_o, ~] = size(I);
+h_s = 240;
+w_s = 240;
+J = imresize(I, [h_s, w_s]);
+for i = 1:length(trainingData.vehicle{10})
+    original_bbox = trainingData.vehicle{10}(i, :);
+    scaled_bbox = [original_bbox(1)*w_s/w_o, original_bbox(2)*h_s/h_o, original_bbox(3)*w_s/w_o, original_bbox(4)*h_s/h_o];
+    I = insertShape(I, 'Rectangle', original_bbox);
+    J = insertShape(J, 'Rectangle', scaled_bbox);
+end
+figure
+imshow(I)
+figure
+imshow(J)
+
+%% Use already scaled training data
+index = 10;
+I = imread(trainingData.imageFilename{index});
+for i = 1:length(trainingData.vehicle{index})
+    original_bbox = trainingData.vehicle{index}(i, :);
+    I = insertShape(I, 'Rectangle', original_bbox);
+end
+figure
+imshow(I)
 
 %% Supporting Functions
 % Function for parsing KITTI data
